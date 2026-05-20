@@ -110,6 +110,30 @@ The design must cover:
 │HashMap+Hash  │  │WASM / Native   │
 └──────────────┘  └────────────────┘
 ```
+## SSE 
+
+> SSE is the server proactively "streaming messages" to the client over a plain HTTP connection that stays open — data flows one message at a time.
+
+---
+
+### How it differs from polling
+
+**Polling:** The client asks "any new messages?" every few seconds — most of the time, nothing comes back.
+
+**SSE:** Once the connection is established, the server pushes when there's something; otherwise it waits — saves bandwidth, lower latency.
+
+---
+
+### How it differs from WebSocket
+
+| | SSE | WebSocket |
+|--|-----|-----------|
+| Direction | Server → Client (unidirectional) | Bidirectional |
+| Protocol | Plain HTTP | Requires protocol upgrade (ws://) |
+| Reconnection | Browser auto-reconnects | Must be handled manually |
+| Best for | Push notifications, status updates | Chat, gaming, bidirectional interaction |
+
+---
 
 The system serves **three distinct client types** with different SDK strategies:
 
