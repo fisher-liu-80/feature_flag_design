@@ -183,6 +183,47 @@ The Management API is the single entry point for all configuration mutations. It
 - Audit log recording (actor, before/after state, reason, ticket ID)
 - Publish job orchestration (trigger compile → build → upload → notify)
 - Debug Explain API for troubleshooting
+### 3.1.1 Kafka-Based Publish job orchestration
+
+The publish pipeline uses Kafka topics as a **choreography-based event chain**, replacing synchronous RPC calls between stages:
+
+```
+┌────────────┐   publish.requested   ┌───────────────┐   publish.compiled   ┌──────────────────┐   publish.completed   ┌─────────────┐
+│Management  │ ───────────────────▶  │Rule Compiler  │ ───────────────────▶ │Snapshot Builder  │ ───────────────────▶  │SSE Gateway  │
+│API         │                       │(consumer)     │                      │(consumer)        │                       │(consumer)   │
+└────────────┘                       └───────────────┘                      └──────────────────┘                       └─────────────┘
+                                            │                                      │                                        │
+                                            ▼                                      ▼                                        ▼
+                                     publish.dlq (on failure)              publish.dlq (on failure)                  Notify Relay/SDKs
+```
+
+**Kafka Topics:**
+
+| Topic | Producer | Consumer | Payload (key fields) |
+|-------|----------|----------|---------------------|
+| `publish.requested` | Management API | Rule Compiler | `jobId`, `appId`, `env`, `requestedBy`, `flagKeys` |
+| `publish.compiled` | Rule Compiler | Snapshot Builder | `jobId`, `appId`, `env`, `compiledIrUrl`, `checksum` |
+| `publish.completed` | Snapshot Builder | SSE Gateway | `jobId`, `appId`, `env`, `snapshotVersion`, `fullUrl`, `deltaUrl`, `checksum` |
+| `publish.failed` | Any stage | Alerting / Management API | `jobId`, `stage`, `error`, `retryable` |
+| `publish.dlq` | Kafka (on max retries) | Ops team | Original message + error metadata |
+
+
+**Kafka consumer config (per stage):**
+```yaml
+spring.kafka:
+  consumer:
+    group-id: rule-compiler-group     # or snapshot-builder-group
+    auto-offset-reset: earliest
+    enable-auto-commit: false          # Manual commit after processing
+    max-poll-records: 1                # Process one job at a time
+  producer:
+    acks: all
+    retries: 3
+    idempotence: true                  # Exactly-once semantics
+```
+
+**Job status tracking:** The Management API also consumes `publish.compiled`, `publish.completed`, and `publish.failed` to update the `publish_jobs` table status (PENDING → COMPILING → BUILDING → SUCCEEDED / FAILED). This gives the Admin UI real-time pipeline visibility.
+
 
 ### 3.2 Feature DB (PostgreSQL)
 
