@@ -240,10 +240,10 @@ Business Service → SDK.isEnabled(flagKey, context) → local in-memory HashMap
 │  │  ┌─────────────┐ ┌────────────────────┐   │    │ → Invalidate /index.html   │       │
 │  │  │mgmt-api (2) │ │rule-compiler (1)   │   │    └────────────────────────────┘       │
 │  │  ├─────────────┤ ├────────────────────┤   │                                          │
-│  │  │snapshot-    │ │sse-gateway (2)     │   │    ┌────────────────────────────┐       │
-│  │  │builder (1)  │ ├────────────────────┤   │    │ DB Migration (ECS RunTask) │       │
-│  │  ├─────────────┤ │relay-proxy (2)     │   │    │ Flyway → RDS staging       │       │
-│  │  └─────────────┘ └────────────────────┘   │    └────────────────────────────┘       │
+│  │  │snapshot-    │ │sse-gateway (2)     │   │                                         │
+│  │  │builder (1)  │ ├────────────────────┤   │                                          │
+│  │  ├─────────────┤ │relay-proxy (2)     │   │                                         │
+│  │  └─────────────┘ └────────────────────┘   │                                          │
 │  └────────────────────────────────────────────┘                                          │
 └─────────────────────────────────────────────────────────────────┬───────────────────────┘
                                                                   │
@@ -258,10 +258,10 @@ Business Service → SDK.isEnabled(flagKey, context) → local in-memory HashMap
 │  │                                            │    │ → S3 prod bucket           │       │
 │  │  ┌─────────────┐  ┌────────────────────┐  │    └────────────────────────────┘       │
 │  │  │mgmt-api (3) │  │rule-compiler (2)   │  │                                          │
-│  │  │Rolling      │  │Rolling             │  │    ┌────────────────────────────┐       │
-│  │  ├─────────────┤  ├────────────────────┤  │    │ DB Migration (ECS RunTask) │       │
-│  │  │snapshot-    │  │sse-gateway (3)     │  │    │ Flyway → RDS prod          │       │
-│  │  │builder (2)  │  │Blue/Green+CodeDeploy│  │    └────────────────────────────┘       │
+│  │  │Rolling      │  │Rolling             │  │                                          │
+│  │  ├─────────────┤  ├────────────────────┤  │                                        │
+│  │  │snapshot-    │  │sse-gateway (3)     │  │                                         │
+│  │  │builder (2)  │  │Blue/Green+CodeDeploy│  │                                        │
 │  │  ├─────────────┤  ├────────────────────┤  │                                          │
 │  │  │relay-proxy  │  │                    │  │                                          │
 │  │  │(2-3/cluster)│  │                    │  │                                          │
@@ -269,6 +269,23 @@ Business Service → SDK.isEnabled(flagKey, context) → local in-memory HashMap
 │  └────────────────────────────────────────────┘                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+###  Deployment Strategy Summary
+
+| Component        | AWS Service            |
+| ---------------- | ---------------------- |
+| Admin UI         | S3 + CloudFront        |
+| Management API   | ECS Fargate + ALB      |
+| Rule Compiler    | ECS Fargate            |
+| Snapshot Builder | ECS Fargate            |
+| SSE Gateway      | ECS + NLB + CodeDeploy |
+| Relay Proxy      | ECS Fargate            |
+| DB Schema        | RDS                    |
+
+**ALB VS NLB:**
+- ALB → APIs (HTTP traffic)
+- NLB → Real-time services (SSE/WebSocket/TCP)
+
 ---
 ## 3. Core Components
 
